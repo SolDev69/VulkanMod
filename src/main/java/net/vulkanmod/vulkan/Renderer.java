@@ -90,6 +90,7 @@ public class Renderer {
 
     private static int currentFrame = 0;
     private static int imageIndex;
+    private static int lastReset = -1;
     private VkCommandBuffer currentCmdBuffer;
     private boolean recordingCmds = false;
 
@@ -101,6 +102,13 @@ public class Renderer {
         device = Vulkan.getVkDevice();
         framesNum = Initializer.CONFIG.frameQueueSize;
         imagesNum = getSwapChain().getImagesNum();
+    }
+
+    public static void setLineWidth(float width) {
+        if (INSTANCE.boundFramebuffer == null) {
+            return;
+        }
+        vkCmdSetLineWidth(INSTANCE.currentCmdBuffer, width);
     }
 
     private void init() {
@@ -249,6 +257,8 @@ public class Renderer {
             mainPass.begin(commandBuffer, stack);
 
             vkCmdSetDepthBias(commandBuffer, 0.0F, 0.0F, 0.0F);
+
+            vkCmdSetLineWidth(commandBuffer, 1.0F);
         }
 
         p.pop();
@@ -361,6 +371,13 @@ public class Renderer {
         p.pop();
         p.round();
         p.push("Frame_ops");
+
+        // runTick might be called recursively,
+        // this check forces sync to avoid upload corruption
+        if (lastReset == currentFrame) {
+            Synchronization.INSTANCE.waitFences();
+        }
+        lastReset = currentFrame;
 
         drawer.resetBuffers(currentFrame);
 
